@@ -1,0 +1,35 @@
+# (Optional) Upload directory (default: ./upload)
+upload_dir: /app/upload
+# (Optional) Output directory (default: ./output)
+output_dir: /app/output
+# (Optional) Temporary directory (default: ./tmp)
+tmp_dir: /app/tmp
+conversion:
+  # (Required) Task name
+  - name: move-files
+    # (Required) Command to run
+    cmd:
+      - 'mkdir -p {{ output_dir }}\{{ ext }}'
+      - 'mv {{ input }} {{ output_dir }}\{{ ext }}\{{ name }}.{{ ext }}'
+    extract: (?P<name>\d+)\.(?P<ext>.{2,})$
+    # (Optional) Upload directory (default: ./upload)
+    upload_dir: /app/upload
+    # (Optional) Output directory (default: ./output)
+    output_dir: /app/output
+    # (Optional) Temporary directory (default: ./tmp)
+    tmp_dir: /app/tmp
+    # (Optional) Scan interval (default: 15 seconds)
+    scan_interval: 15
+    # (Optional) Scan exclude. Allows RegEx. Exclude > Include (default: [])
+    scan_exclude:
+      # Excludes any jpg or jpeg files
+      - .*\.jpe?g
+    # (Optional) Scan include. Allows RegEx. Exclude > Include (default: [])
+    scan_include:
+      # Allows only pdf files
+      - .*\.pdf
+logs:
+  # (Required) Path to logs file (default: ./logs/converter.log)
+  path: /app/config/converter.log
+  # (Optional) Log level (default: INFO)
+  level: 'INFO'
