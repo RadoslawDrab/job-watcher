@@ -1,10 +1,14 @@
 FROM python:3.12-slim
 RUN apt-get update && apt-get install -y ffmpeg imagemagick ghostscript && rm -rf /var/lib/apt/lists/*
 
+ARG VERSION
+ENV VERSION=$VERSION
+
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
 
 COPY . .
 COPY config.yml /app/config/config.yml

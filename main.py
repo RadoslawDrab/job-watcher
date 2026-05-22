@@ -1,3 +1,4 @@
+import os
 import re
 import shutil
 import subprocess
@@ -115,6 +116,7 @@ def register_task():
         Logger.log(str(error), log_type='ERROR')
 
 def init():
+    Logger.log(f'Version: {os.getenv("VERSION") or "unknown"}')
     # import json
     # print(json.dumps(Config.data, indent=2))
 
