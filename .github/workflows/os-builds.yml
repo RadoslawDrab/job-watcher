@@ -10,7 +10,7 @@ jobs:
   config:
     runs-on: ubuntu-latest
     outputs:
-      name: ${{ steps.name.outputs.name }}
+      name: ${{ steps.set.outputs.name }}
     steps:
       - id: set
         run: echo "name=${NAME:-job-worker}" >> $GITHUB_OUTPUT
