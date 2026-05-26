@@ -1,6 +1,5 @@
 import os
 import re
-import shutil
 import subprocess
 from datetime import timedelta
 from pathlib import Path
@@ -10,121 +9,146 @@ from jinja2 import BaseLoader, Environment, select_autoescape
 from utils.args import Args
 import queue
 
-from utils.config import Config
+from utils.config import Command, Config
+from utils.database import Database
 from utils.logger import Logger, LoggerFormat
 from utils.tasks import TasksHandler
 
 
-Args()
-if Args.config_path.suffix not in ['.yml', '.yaml']:
-        raise ValueError(f"Config file must have .yml or .yaml extension, got {Args.config_path.suffix}")
+try:
+    Args()
+    if Args.config_path.suffix not in ['.yml', '.yaml']:
+            raise ValueError(f"Config file must have .yml or .yaml extension, got {Args.config_path.suffix}")
 
-Config(Args.config_path)
-if Config.logs.path.suffix != '.log':
-    raise ValueError(f"Log file must have .log extension, got {Config.logs.path.suffix}")
-Config.logs.path.parent.mkdir(exist_ok=True)
+    Config(Args.config_path)
+    if Config.logs.path.suffix != '.log':
+        raise ValueError(f"Log file must have .log extension, got {Config.logs.path.suffix}")
 
-TasksHandler()
-Logger(
-    Config.logs.path,
-    default_log_type='DEBUG',
-    error_log_type='ERROR',
-    logger_format=LoggerFormat(show_traceback=True),
-    min_log_level=Config.logs.level)
+    TasksHandler()
+    Logger(
+        Config.logs.path,
+        default_log_type='DEBUG',
+        error_log_type='ERROR',
+        logger_format=LoggerFormat(show_traceback=True),
+        min_log_level=Config.logs.level)
 
-files_queue = queue.Queue()
-env = Environment(
-    loader=BaseLoader(),
-    autoescape=select_autoescape()
-)
+    files_queue = queue.Queue()
+    env = Environment(
+        loader=BaseLoader(),
+        autoescape=select_autoescape()
+    )
+except Exception as error:
+    print(str(error))
+    input()
 
 # Register tasks
 def register_task():
-    try:
-        for conv in Config.conversion:
-            if conv.name is None:
-                raise ValueError('Task name is required')
+    for conv in Config.conversion:
+        if conv.name is None:
+            raise ValueError('Task name is required')
+        if conv.cmd is None:
+            raise ValueError('Command is required')
 
-            task_name_prefix = conv.name + '__'
-            if conv.upload_dir is None: conv.upload_dir = Config.upload_dir
-            if conv.output_dir is None: conv.output_dir = Config.output_dir
+        task_name_prefix = conv.name + '__'
+        upload_dir = Config.upload_dir if conv.upload_dir is None else conv.upload_dir
+        output_dir = Config.output_dir if conv.output_dir is None else conv.output_dir
+        tmp_dir = Config.tmp_dir if conv.tmp_dir is None else conv.tmp_dir
+        max_iterations = (Config.max_iterations if conv.max_iterations is None else conv.max_iterations) or 0
+        include_dirs = conv.include_dirs if conv.include_dirs is not None else Config.include_dirs
+        scan_interval = max(conv.scan_interval if conv.scan_interval is not None else Config.scan_interval, 1)
 
-            if not conv.output_dir.is_absolute():
-                raise ValueError(f'Output directory must be absolute, got {conv.output_dir}')
-            if not conv.upload_dir.is_absolute():
-                raise ValueError(f'Upload directory must be absolute, got {conv.upload_dir}')
-            if conv.output_dir.is_relative_to(conv.upload_dir):
-                raise ValueError(f'Output directory cannot be relative to upload directory, got {conv.output_dir}')
+        if not output_dir.is_absolute():
+            raise ValueError(f'Output directory must be absolute, got {output_dir}')
+        if not upload_dir.is_absolute():
+            raise ValueError(f'Upload directory must be absolute, got {upload_dir}')
+        if output_dir.is_relative_to(upload_dir):
+            raise ValueError(f'Output directory cannot be relative to upload directory, got {output_dir}')
 
-            Logger.log(f"Registering task '{conv.name}'", print_only=True)
+        upload_dir.mkdir(exist_ok=True)
+        output_dir.mkdir(exist_ok=True)
+        tmp_dir.mkdir(exist_ok=True)
 
-            @TasksHandler.set(f'{task_name_prefix}watcher', interval=timedelta(seconds=conv.scan_interval), log=False, print_message=False)
-            def watcher(**kwargs):
-                paths: list[Path] = []
-                for item in conv.upload_dir.rglob('*'):
-                    if not item.is_file():
-                        continue
-                    if not conv.check(str(item), re.IGNORECASE):
-                        continue
-                    paths.append(item.relative_to(conv.upload_dir))
-                if len(paths) > 0:
-                    files_queue.put(paths)
+        Database(tmp_dir.joinpath('db.json'))
 
-            @TasksHandler.set(f'{task_name_prefix}worker', interval=timedelta(milliseconds=250))
-            def worker(**kwargs):
-                paths: list[Path] | None = files_queue.get()
-                if paths is None:
+        Logger.log(f"Registering task '{conv.name}'", print_only=True)
+
+        @TasksHandler.set(f'{task_name_prefix}watcher', interval=timedelta(seconds=scan_interval), log=False, print_message=False)
+        def watcher(**kwargs):
+            paths: list[Path] = []
+            for item in upload_dir.rglob('*'):
+                if not item.is_file() and not item.is_dir() if include_dirs else not item.is_file():
+                    continue
+                if not conv.check(str(item), re.IGNORECASE):
+                    continue
+                paths.append(item.relative_to(upload_dir))
+            if len(paths) > 0:
+                files_queue.put(paths)
+
+        @TasksHandler.set(f'{task_name_prefix}worker', interval=timedelta(milliseconds=250))
+        def worker(**kwargs):
+            paths: list[Path] | None = files_queue.get()
+            if paths is None:
+                return
+            for path in paths:
+                posix_path = path.as_posix()
+                current_iteration = Database.data[posix_path] or 0
+
+                if current_iteration >= max_iterations > 0:
+                    Logger.log(f"File '{path}' has reached maximum iterations ({max_iterations})")
+                    continue
+
+                Logger.log(f"Converting '{path}'", print_only=True)
+                match = re.match(conv.extract or '^.+$', str(path.name), re.IGNORECASE)
+
+                if match is None:
+                    Logger.log(f"File '{path}' does not match pattern '{conv.extract}'")
                     return
-                for path in paths:
-                    Logger.log(f"Converting '{path}'", print_only=True)
-                    match = re.match(conv.extract or '^.+$', str(path.name), re.IGNORECASE)
 
-                    if match is None:
-                        Logger.log(f"File '{path}' does not match pattern '{conv.extract}'", log_type='WARNING')
-                        return
+                match_data = { '_' + str(index): value for index, value in enumerate(match.groups()) }
 
-                    match_data = { '_' + str(index): value for index, value in enumerate(match.groups()) }
+                cmds: list[str | Command] = (conv.cmd if isinstance(conv.cmd, list) else [conv.cmd]) if conv.cmd else []
 
-                    cmds: list[str] = conv.cmd
-                    if isinstance(cmds, str):
-                        cmds = [cmds]
+                for cmd in cmds:
+                    cmd_value = cmd if isinstance(cmd, str) else cmd.value
+                    continue_on_error = cmd.continue_on_error if isinstance(cmd, Command) else Config.continue_on_error
 
-                    for cmd in cmds:
-                        template = env.from_string(cmd)
-                        rendered = template.render(
-                            **match.groupdict(),
-                            args=match_data,
-                            input=str(conv.upload_dir.joinpath(path)),
-                            input_stem=str(path.stem),
-                            input_name=str(path.name),
-                            input_ext=str(path.suffix),
-                            input_dir=conv.upload_dir,
-                            output_dir=conv.output_dir,
-                            tmp_dir=conv.tmp_dir,
-                            cwd=Path.cwd()
-                        )
+                    template = env.from_string(cmd_value)
+                    rendered = template.render(
+                        **match.groupdict(),
+                        args=match_data,
+                        input=str(upload_dir.joinpath(path)),
+                        input_stem=str(path.stem),
+                        input_name=str(path.name),
+                        input_ext=str(path.suffix),
+                        input_dir=upload_dir,
+                        output_dir=output_dir,
+                        tmp_dir=tmp_dir,
+                        cwd=Path.cwd()
+                    )
 
-                        try:
-                            text = subprocess.run(rendered, check=True, shell=True, capture_output=True, text=True)
-                            Logger.log(text.stdout)
-                        except Exception as error:
-                            Logger.log('Error executing command:', str(error), f'[CMD: "{rendered}"]', log_type='ERROR')
-                            break
+                    try:
+                        text = subprocess.run(rendered, check=True, shell=True, capture_output=True, text=True)
+                        Logger.log(text.stdout)
+                    except Exception as error:
+                        Logger.log('Error executing command:', str(error), f'[CMD: "{rendered}"]', log_type='ERROR')
+                        if not continue_on_error: break
 
-                    files_queue.task_done()
-    except Exception as error:
-        Logger.log(str(error), log_type='ERROR')
+                Database.data[posix_path] = current_iteration + 1
+
+                Database.save()
+                files_queue.task_done()
 
 def init():
-    Logger.log(f'Version: {os.getenv("VERSION") or "unknown"}')
-    # import json
-    # print(json.dumps(Config.data, indent=2))
+    try:
+        Logger.log(f'Version: {os.getenv("VERSION") or "unknown"}')
 
-    register_task()
-    TasksHandler.start()
-    while True:
-        sleep(60 * 60 * 24)
-
+        register_task()
+        TasksHandler.start()
+        while True:
+            sleep(60 * 60 * 24)
+    except Exception as error:
+        Logger.log(str(error), log_type='ERROR')
+        input()
 if __name__ == '__main__':
     init()
 

@@ -53,6 +53,10 @@ class Namespace(SimpleNamespace):
 			return super().__getattribute__(item)
 		except AttributeError:
 			return None
+	def __setattr__(self, key, value):
+		super().__setattr__(key, value)
+	def __setitem__(self, key, value):
+		setattr(self, key, value)
 	def __iter__(self) -> Iterator[tuple[str, any]]:
 		return iter([(k, v) for k, v in self.dict().items()])
 	def __contains__(self, item):

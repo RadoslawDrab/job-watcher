@@ -1,3 +1,5 @@
 tmp/
 .venv/
 .idea/
+build/
+dist/

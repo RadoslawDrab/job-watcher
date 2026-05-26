@@ -1,8 +1,8 @@
-# (Optional) Upload directory (default: ./upload)
+# (Optional) Upload directory (default: $CWD/upload)
 upload_dir: /app/upload
-# (Optional) Output directory (default: ./output)
+# (Optional) Output directory (default: $CWD/output)
 output_dir: /app/output
-# (Optional) Temporary directory (default: ./tmp)
+# (Optional) Temporary directory (default: $CWD/tmp)
 tmp_dir: /app/tmp
 conversion:
   # (Required) Task name
@@ -11,13 +11,15 @@ conversion:
     cmd:
       - 'mkdir -p {{ output_dir }}\{{ ext }}'
       - 'mv {{ input }} {{ output_dir }}\{{ ext }}\{{ name }}.{{ ext }}'
-    extract: (?P<name>\d+)\.(?P<ext>.{2,})$
-    # (Optional) Upload directory (default: ./upload)
+    extract: (?P<name>.+)\.(?P<ext>.{2,})$
+    # (Optional) Upload directory (default: $CWD/upload)
     upload_dir: /app/upload
-    # (Optional) Output directory (default: ./output)
+    # (Optional) Output directory (default: $CWD/output)
     output_dir: /app/output
-    # (Optional) Temporary directory (default: ./tmp)
+    # (Optional) Temporary directory (default: $CWD/tmp)
     tmp_dir: /app/tmp
+    # (Optional) Include directories (default: false)
+    include_dirs: false
     # (Optional) Scan interval (default: 15 seconds)
     scan_interval: 15
     # (Optional) Scan exclude. Allows RegEx. Exclude > Include (default: [])
@@ -29,7 +31,7 @@ conversion:
       # Allows only pdf files
       - .*\.pdf
 logs:
-  # (Required) Path to logs file (default: ./logs/converter.log)
+  # (Required) Path to logs file (default: $CWD/logs/converter.log)
   path: /app/config/converter.log
   # (Optional) Log level (default: INFO)
   level: 'INFO'
