@@ -7,25 +7,30 @@ on:
   workflow_dispatch:
 
 jobs:
+  config:
+    runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.name.outputs.name }}
+    steps:
+      - id: set
+        run: echo "name=${NAME:-job-worker}" >> $GITHUB_OUTPUT
   build:
+    needs: config
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
             arch: x64
-            output: converter-linux-x64
+            suffix: linux-x64
           - os: ubuntu-24.04-arm
             arch: arm64
-            output: converter-linux-arm64
+            suffix: linux-arm64
           - os: windows-latest
             arch: x64
-            output: converter-windows-x64.exe
+            suffix: windows-x64.exe
           - os: macos-latest
             arch: arm64
-            output: converter-macos-arm64
-          - os: macos-13
-            arch: x64
-            output: converter-macos-x64
+            suffix: macos-arm64
 
     runs-on: ${{ matrix.os }}
 
@@ -41,13 +46,13 @@ jobs:
         run: pip install -r requirements.txt pyinstaller
 
       - name: Build
-        run: pyinstaller --onefile --name ${{ matrix.output }} main.py
+        run: pyinstaller --onefile --name ${{ needs.config.outputs.name }}-${{ matrix.suffix }} main.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.output }}
-          path: dist/${{ matrix.output }}
+          path: dist/${{ needs.config.outputs.name }}-${{ matrix.suffix }}
 
   release:
     needs: build
