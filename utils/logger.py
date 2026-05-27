@@ -118,7 +118,7 @@ class Logger(Singleton):
 
 	@classmethod
 	@Singleton.exists
-	def log(cls, *messages: any, log_type: str | None = None, sep: str = ' ', end: str = '', print_message: bool | None = None, print_only: bool | None = None, check_messages: bool = False) -> None:
+	def log(cls, *messages: any, log_type: str | None = None, sep: str = ' ', end: str = '', print_message: bool | None = None, print_only: bool | None = None, check_messages: bool = False, force_print: bool | None = None) -> None:
 		"""
 		The main logging method. Writes a message to the console and/or log file.
 
@@ -130,6 +130,7 @@ class Logger(Singleton):
 		    print_message: If True, prints the log to the console.
 		    print_only: Overrides the instance's print_only setting for this specific call.
 		    check_messages: If True, filters out any message parts that are None or empty.
+		    force_print: If True, forces the log to be printed to the console.
 		"""
 		self = cls._instance
 		log_type = log_type or self._default_log_type or ''
@@ -193,7 +194,7 @@ class Logger(Singleton):
 		_content = ' '.join(content)
 		# Print to console if required.
 		is_min_log = self._min_log_index <= self.log_types.index(log_type)
-		if is_min_log if print_message is None else print_message and is_min_log:
+		if force_print if force_print is not None else (is_min_log if print_message is None else print_message and is_min_log):
 			print(_content)
 		# Write to file if not in print-only mode.
 		if print_only or self._print_only:

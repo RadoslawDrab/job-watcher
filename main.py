@@ -76,7 +76,7 @@ def register_task():
 
         Logger.log(f"Registering task '{conv.name}'", print_only=True)
 
-        @TasksHandler.set(f'{task_name_prefix}watcher', interval=timedelta(seconds=scan_interval), log=False, print_message=False)
+        @TasksHandler.set(f'{task_name_prefix}watcher', interval=timedelta(seconds=scan_interval), log=True, print_message=True, log_type='DEBUG')
         def watcher(**kwargs):
             paths: list[Path] = []
             for item in upload_dir.rglob('*'):
@@ -88,7 +88,7 @@ def register_task():
             if len(paths) > 0:
                 files_queue.put(paths)
 
-        @TasksHandler.set(f'{task_name_prefix}worker', interval=timedelta(milliseconds=250))
+        @TasksHandler.set(f'{task_name_prefix}worker', interval=timedelta(milliseconds=250), log_type='DEBUG')
         def worker(**kwargs):
             paths: list[Path] | None = files_queue.get()
             if paths is None:
@@ -114,7 +114,11 @@ def register_task():
 
                 for cmd in cmds:
                     cmd_value = cmd if isinstance(cmd, str) else cmd.value
-                    continue_on_error = cmd.continue_on_error if isinstance(cmd, Command) else Config.continue_on_error
+                    continue_on_error = cmd.continue_on_error if isinstance(cmd, Command) and cmd.continue_on_error is not None else Config.continue_on_error
+
+                    if len(cmd_value) == 0:
+                        Logger.log(f"Command is empty, skipping", log_type='WARNING')
+                        continue
 
                     template = env.from_string(cmd_value)
                     rendered = template.render(
@@ -132,7 +136,7 @@ def register_task():
 
                     try:
                         text = subprocess.run(rendered, check=True, shell=True, capture_output=True, text=True)
-                        Logger.log(text.stdout)
+                        if len(text.stdout) > 0: Logger.log(text.stdout, log_type='INFO')
                     except Exception as error:
                         Logger.log('Error executing command:', str(error), f'[CMD: "{rendered}"]', log_type='ERROR')
                         if not continue_on_error: break
@@ -144,7 +148,7 @@ def register_task():
 
 def init():
     try:
-        Logger.log(f'Version: {VERSION}')
+        Logger.log(f'Version: {VERSION}', force_print=True)
 
         register_task()
         TasksHandler.start()

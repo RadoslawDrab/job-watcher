@@ -126,6 +126,7 @@ class TasksHandler(Singleton):
 		log: bool = None,
 		dry: bool = None,
 		print_message: bool = None,
+		log_type: str = 'INFO'
 	):
 		"""
 		A decorator factory to define and configure a new task.
@@ -171,7 +172,7 @@ class TasksHandler(Singleton):
 					while not before():
 						_start_time += timedelta(days=1)
 
-					Logger.log(task_log, f"will run at {_start_time}", log_type='INFO', print_only=not _log)
+					Logger.log(task_log, f"will run at {_start_time}", log_type=log_type or 'INFO', print_only=not _log)
 					sleep((_start_time - datetime.now()).total_seconds())
 
 				return_value = None
@@ -185,7 +186,7 @@ class TasksHandler(Singleton):
 				)
 				# The main loop for the task.
 				while loop_check():
-					Logger.log(task_log, "started", log_type='INFO', print_only=not _log, print_message=_print_message)
+					Logger.log(task_log, "started", log_type=log_type or 'INFO', print_only=not _log, print_message=_print_message)
 					# Execute the user's original function if not a dry run.
 					return_value = func(
 						*args, **kwargs, **{
@@ -204,11 +205,11 @@ class TasksHandler(Singleton):
 						f"{round(i / iterations * 100, 1)}% ({i}/{iterations})" if iterations else None,
 						f"Next run at {(datetime.now() + timedelta(seconds=sleep_time)).strftime('%Y-%m-%d %H:%M:%S')}" if loop_check() else None,
 					]
-					Logger.log(*messages, log_type='INFO', sep=' | ', print_only=not _log, check_messages=True, print_message=_print_message)
+					Logger.log(*messages, log_type=log_type or 'INFO', sep=' | ', print_only=not _log, check_messages=True, print_message=_print_message)
 
 					if loop_check(): sleep(sleep_time)
 
-				Logger.log(task_log, "finished completely", log_type='INFO', print_only=not _log, print_message=_print_message)
+				Logger.log(task_log, "finished completely", log_type=log_type or 'INFO', print_only=not _log, print_message=_print_message)
 
 			# Register the wrapped function with the handler.
 			if new:
