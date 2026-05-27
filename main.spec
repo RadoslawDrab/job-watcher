@@ -7,10 +7,15 @@ a = Analysis(
     binaries=[],
     datas=[
     	('config.yml', '.'),
-    	('utils/', 'utils/')
+    	('utils/', 'utils/'),
+    	('version.py', '.'),
 	],
     hiddenimports=[
-    	'utils.config'
+    	'utils.config',
+    	'utils.args',
+    	'utils.logger',
+    	'utils.tasks',
+    	'utils.database',
     ],
     hookspath=[],
     hooksconfig={},

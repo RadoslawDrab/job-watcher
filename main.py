@@ -14,6 +14,10 @@ from utils.database import Database
 from utils.logger import Logger, LoggerFormat
 from utils.tasks import TasksHandler
 
+try:
+    from version import VERSION
+except ImportError:
+    VERSION = 'dev'
 
 try:
     Args()
@@ -140,7 +144,7 @@ def register_task():
 
 def init():
     try:
-        Logger.log(f'Version: {os.getenv("VERSION") or "unknown"}')
+        Logger.log(f'Version: {VERSION}')
 
         register_task()
         TasksHandler.start()
