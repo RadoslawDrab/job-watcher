@@ -1,37 +1,53 @@
-# (Optional) Upload directory (default: $CWD/upload)
-upload_dir: /app/upload
-# (Optional) Output directory (default: $CWD/output)
-output_dir: /app/output
-# (Optional) Temporary directory (default: $CWD/tmp)
-tmp_dir: /app/tmp
-conversion:
-  # (Required) Task name
-  - name: move-files
-    # (Required) Command to run
-    cmd:
-      - 'mkdir -p {{ output_dir }}\{{ ext }}'
-      - 'mv {{ input }} {{ output_dir }}\{{ ext }}\{{ name }}.{{ ext }}'
-    extract: (?P<name>.+)\.(?P<ext>.{2,})$
-    # (Optional) Upload directory (default: $CWD/upload)
-    upload_dir: /app/upload
-    # (Optional) Output directory (default: $CWD/output)
-    output_dir: /app/output
-    # (Optional) Temporary directory (default: $CWD/tmp)
-    tmp_dir: /app/tmp
-    # (Optional) Include directories (default: false)
-    include_dirs: false
-    # (Optional) Scan interval (default: 15 seconds)
-    scan_interval: 15
-    # (Optional) Scan exclude. Allows RegEx. Exclude > Include (default: [])
-    scan_exclude:
-      # Excludes any jpg or jpeg files
-      - .*\.jpe?g
-    # (Optional) Scan include. Allows RegEx. Exclude > Include (default: [])
-    scan_include:
-      # Allows only pdf files
-      - .*\.pdf
 logs:
-  # (Required) Path to logs file (default: $CWD/logs/converter.log)
-  path: /app/config/converter.log
-  # (Optional) Log level (default: INFO)
-  level: 'INFO'
+  # (Required) Path to logs file (default: $CWD/job-worker.log)
+  path: D:\scripts\private\job-worker\job-worker.log
+  # (Optional) Log level. Choices: [DEBUG, INFO, WARNING, ERROR] (default: INFO)
+  level: INFO
+jobs:
+  # (Required) Task name
+- name: example
+  # (Optional) Upload directory. Must be absolute. Overrides global `upload_dir`
+  upload_dir: null
+  # (Optional) Output directory. Must be absolute. Overrides global `output_dir`
+  output_dir: null
+  # (Optional) Temporary directory. Must be absolute. Overrides global `tmp_dir`
+  tmp_dir: null
+  # (Optional) Search recursively. Overrides global `recursive`
+  recursive: true
+  # (Required) Commands to run. Can be a `string`, `Command`, or list of `strings` or `Commands`
+  cmd:
+    # (Required) CLI command
+  - value: 'echo Working on: {{ name }}'
+    # (Optional) Continue on command failure. Overrides global `continue_on_error` (default: false)
+    continue_on_error: true
+  - 'echo File extension: {{ input_ext }}'
+  # (Optional) Regex to extract input data and use in commands. Use (?P<name>...) to named groups
+  extract: (?P<name>.*\..{2,})$
+  # (Optional) Maximum number of iterations. Overrides global `max_iterations`
+  max_iterations: null
+  # (Optional) Scan interval. Overrides global `scan_interval`
+  scan_interval: null
+  # (Optional) Scan exclude. Allows RegEx. Exclude > Include (default: [])
+  scan_exclude: []
+  # (Optional) Scan include. Allows RegEx. Exclude > Include (default: [])
+  scan_include: []
+  # (Optional) Include directories. Overrides global `include_dirs`
+  include_dirs: null
+# (Optional) Maximum number of iterations per file. 0 for infinite (default: 1)
+max_iterations: 1
+# (Optional) Scan interval (default: 15 seconds)
+scan_interval: 15
+# (Optional) Include directories (default: false)
+include_dirs: false
+# (Required) Upload directory. Must be absolute (default: $CWD/upload)
+upload_dir: ./app/upload
+# (Optional) Temporary directory. Must be absolute (default: $CWD/tmp)
+tmp_dir: /app/tmp
+# (Required) Output directory. Must be absolute (default: $CWD/output)
+output_dir: /app/output
+# (Optional) Continue on command failure (default: false)
+continue_on_error: false
+# (Optional) Use persistent or in-memory database (default: false)
+db_persistent: false
+# (Optional) Search recursively (default: true)
+recursive: true
