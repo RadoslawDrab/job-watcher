@@ -13,6 +13,10 @@ class Logs(ConfigNamespace):
 	"""(Required) Path to logs file (default: $CWD/job-worker.log)"""
 	level: str = 'INFO'
 	"""(Optional) Log level. Choices: [DEBUG, INFO, WARNING, ERROR] (default: INFO)"""
+	log_watcher: bool = False
+	"""(Optional) Log anything related to watcher (default: false)"""
+	log_worker: bool = True
+	"""(Optional) Log anything related to worker (default: true)"""
 	@classmethod
 	def required_keys(cls) -> list[str]:
 		return ['path']
@@ -48,8 +52,6 @@ class Job(ConfigNamespace):
 	"""(Optional) Output directory. Must be absolute. Overrides global `output_dir`"""
 	tmp_dir: Path | None = None
 	"""(Optional) Temporary directory. Overrides global `tmp_dir`"""
-	recursive: bool = True
-	"""Search recursively. Overrides global `recursive`"""
 	cmd: str | Command | list[str | Command] = None
 	"""(Required) Commands to run. Can be a `string`, `Command`, or list of `strings` or `Commands`"""
 	extract: str = '(.*)\\.(.{2,})$'
@@ -70,11 +72,11 @@ class Job(ConfigNamespace):
 	@staticmethod
 	def _check_regex(value: str, check_list: list[str], flags: int | re.RegexFlag = 0):
 		return any(re.match(i, value, flags=flags) for i in check_list)
-	def check(self, value: str, flags: int | re.RegexFlag= 0):
+	def check(self, value: str, flags: int | re.RegexFlag = 0):
 		return not self.is_excluded(value, flags) and self.is_included(value, flags)
-	def is_included(self, value: str, flags: int | re.RegexFlag= 0):
+	def is_included(self, value: str, flags: int | re.RegexFlag = 0):
 		return self._check_regex(value, self.scan_include, flags) if len(self.scan_include) > 0 else True
-	def is_excluded(self, value: str, flags: int | re.RegexFlag= 0):
+	def is_excluded(self, value: str, flags: int | re.RegexFlag = 0):
 		return self._check_regex(value, self.scan_exclude, flags) if len(self.scan_exclude) > 0 else False
 
 	@classmethod

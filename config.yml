@@ -3,6 +3,10 @@ logs:
   path: D:\scripts\private\job-worker\job-worker.log
   # (Optional) Log level. Choices: [DEBUG, INFO, WARNING, ERROR] (default: INFO)
   level: INFO
+  # (Optional) Log anything related to watcher (default: false)
+  log_watcher: false
+  # (Optional) Log anything related to worker (default: true)
+  log_worker: true
 jobs:
   # (Required) Task name
 - name: example
@@ -12,8 +16,6 @@ jobs:
   output_dir: null
   # (Optional) Temporary directory. Must be absolute. Overrides global `tmp_dir`
   tmp_dir: null
-  # (Optional) Search recursively. Overrides global `recursive`
-  recursive: true
   # (Required) Commands to run. Can be a `string`, `Command`, or list of `strings` or `Commands`
   cmd:
     # (Required) CLI command
