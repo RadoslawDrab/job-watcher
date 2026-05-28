@@ -48,19 +48,19 @@ except Exception as error:
 
 # Register tasks
 def register_task():
-    for conv in Config.conversion:
-        if conv.name is None:
+    for job in Config.conversion:
+        if job.name is None:
             raise ValueError('Task name is required')
-        if conv.cmd is None:
+        if job.cmd is None:
             raise ValueError('Command is required')
 
-        task_name_prefix = conv.name + '__'
-        upload_dir = Config.upload_dir if conv.upload_dir is None else conv.upload_dir
-        output_dir = Config.output_dir if conv.output_dir is None else conv.output_dir
-        tmp_dir = Config.tmp_dir if conv.tmp_dir is None else conv.tmp_dir
-        max_iterations = (Config.max_iterations if conv.max_iterations is None else conv.max_iterations) or 0
-        include_dirs = conv.include_dirs if conv.include_dirs is not None else Config.include_dirs
-        scan_interval = max(conv.scan_interval if conv.scan_interval is not None else Config.scan_interval, 1)
+        task_name_prefix = job.name + '__'
+        upload_dir = Config.upload_dir if job.upload_dir is None else job.upload_dir
+        output_dir = Config.output_dir if job.output_dir is None else job.output_dir
+        tmp_dir = Config.tmp_dir if job.tmp_dir is None else job.tmp_dir
+        max_iterations = (Config.max_iterations if job.max_iterations is None else job.max_iterations) or 0
+        include_dirs = job.include_dirs if job.include_dirs is not None else Config.include_dirs
+        scan_interval = max(job.scan_interval if job.scan_interval is not None else Config.scan_interval, 1)
 
         if not output_dir.is_absolute():
             raise ValueError(f'Output directory must be absolute, got {output_dir}')
@@ -75,7 +75,7 @@ def register_task():
 
         Database(tmp_dir.joinpath('db.json'))
 
-        Logger.log(f"Registering task '{conv.name}'", print_only=True)
+        Logger.log(f"Registering task '{job.name}'", print_only=True)
 
         @TasksHandler.set(f'{task_name_prefix}watcher', interval=timedelta(seconds=scan_interval), log=True, print_message=True, log_type='DEBUG')
         def watcher(**kwargs):
@@ -83,7 +83,7 @@ def register_task():
             for item in upload_dir.rglob('*'):
                 if not item.is_file() and not item.is_dir() if include_dirs else not item.is_file():
                     continue
-                if not conv.check(str(item), re.IGNORECASE):
+                if not job.check(str(item), re.IGNORECASE):
                     continue
                 paths.append(item.relative_to(upload_dir))
             if len(paths) > 0:
@@ -103,15 +103,15 @@ def register_task():
                     continue
 
                 Logger.log(f"Converting '{path}'", print_only=True)
-                match = re.match(conv.extract or '^.+$', str(path.name), re.IGNORECASE)
+                match = re.match(job.extract or '^.+$', str(path.name), re.IGNORECASE)
 
                 if match is None:
-                    Logger.log(f"File '{path}' does not match pattern '{conv.extract}'")
+                    Logger.log(f"File '{path}' does not match pattern '{job.extract}'")
                     return
 
                 match_data = { '_' + str(index): value for index, value in enumerate(match.groups()) }
 
-                cmds: list[str | Command] = (conv.cmd if isinstance(conv.cmd, list) else [conv.cmd]) if conv.cmd else []
+                cmds: list[str | Command] = (job.cmd if isinstance(job.cmd, list) else [job.cmd]) if job.cmd else []
 
                 for cmd in cmds:
                     cmd_value = cmd if isinstance(cmd, str) else cmd.value
