@@ -167,7 +167,7 @@ def register_task():
                     except subprocess.CalledProcessError as error:
                         if show_error or not continue_on_error:
                             Logger.log(f'Error executing command: {str(error.stderr).strip()}', log_type='ERROR')
-                            Logger.log(f'[Command: {str(error.cmd).lstrip('\\n')}]', log_type='ERROR', continue_message=True)
+                            Logger.log(f'[Command: {str(error.cmd).lstrip()}]', log_type='ERROR', continue_message=True)
                         if not continue_on_error: break
 
                 Database.data[posix_path] = current_iteration + 1
