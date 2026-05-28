@@ -6,6 +6,7 @@ from pathlib import Path
 from time import sleep
 from jinja2 import BaseLoader, Environment, select_autoescape
 
+from utils import get_dict_keys
 from utils.args import Args
 import queue
 
@@ -121,18 +122,19 @@ def register_task():
                         continue
 
                     template = env.from_string(cmd_value)
-                    rendered = template.render(
+                    _kwargs = {
                         **match.groupdict(),
-                        args=match_data,
-                        input=str(upload_dir.joinpath(path)),
-                        input_stem=str(path.stem),
-                        input_name=str(path.name),
-                        input_ext=str(path.suffix),
-                        input_dir=upload_dir,
-                        output_dir=output_dir,
-                        tmp_dir=tmp_dir,
-                        cwd=Path.cwd()
-                    )
+                        'args': match_data,
+                        'input': str(upload_dir.joinpath(path)),
+                        'input_stem': str(path.stem),
+                        'input_name': str(path.name),
+                        'input_ext': str(path.suffix),
+                        'input_dir': upload_dir,
+                        'output_dir': output_dir,
+                        'tmp_dir': tmp_dir,
+                        'cwd': Path.cwd()
+                    }
+                    rendered = template.render(**_kwargs, keys=get_dict_keys(_kwargs, include_dicts=True))
 
                     try:
                         text = subprocess.run(rendered, check=True, shell=True, capture_output=True, text=True)
