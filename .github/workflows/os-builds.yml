@@ -54,7 +54,9 @@ jobs:
         run: pip install -r requirements.txt pyinstaller
 
       - name: Build
-        run: pyinstaller main.spec --name ${{ needs.config.outputs.name }}_${{ matrix.suffix }} main.py
+        env:
+          APP_NAME: ${{ needs.config.outputs.name }}_${{ matrix.suffix }}
+        run: pyinstaller build.spec main.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

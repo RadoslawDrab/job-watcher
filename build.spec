@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-
+import os
 
 a = Analysis(
     ['main.py'],
@@ -26,13 +26,15 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
+name = os.environ.get('APP_NAME', 'job-worker') 
+
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
     a.datas,
     [],
-    name='job-worker',
+    name=name,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
