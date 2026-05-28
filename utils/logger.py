@@ -2,6 +2,7 @@ import traceback
 from pathlib import Path
 from datetime import datetime
 
+from utils import Namespace
 from utils.classes import Singleton
 
 
@@ -20,6 +21,13 @@ class LoggerFormat:
 		return LoggerFormat()
 
 class Logger(Singleton):
+	class LastData(Namespace):
+		"""Stores the last log entry data."""
+		log_type: str | None = None
+		header: str | None = None
+		date: str | None = None
+		message: str | None = None
+	last: LastData = LastData()
 	"""
 	A singleton class for handling application-wide logging.
 
@@ -118,7 +126,18 @@ class Logger(Singleton):
 
 	@classmethod
 	@Singleton.exists
-	def log(cls, *messages: any, log_type: str | None = None, sep: str = ' ', end: str = '', print_message: bool | None = None, print_only: bool | None = None, check_messages: bool = False, force_print: bool | None = None) -> None:
+	def log(
+		cls,
+		*messages: any,
+		log_type: str | None = None,
+		sep: str = ' ',
+		end: str = '',
+		print_message: bool | None = None,
+		print_only: bool | None = None,
+		check_messages: bool = False,
+		force_print: bool | None = None,
+		continue_message: bool = False
+	) -> None:
 		"""
 		The main logging method. Writes a message to the console and/or log file.
 
@@ -131,6 +150,7 @@ class Logger(Singleton):
 		    print_only: Overrides the instance's print_only setting for this specific call.
 		    check_messages: If True, filters out any message parts that are None or empty.
 		    force_print: If True, forces the log to be printed to the console.
+		    continue_message: If True, appends the log to the last log entry.
 		"""
 		self = cls._instance
 		log_type = log_type or self._default_log_type or ''
@@ -159,7 +179,7 @@ class Logger(Singleton):
 
 		# Assemble the final log content.
 		content: list[str | None] = [
-			header_string,
+			header_string if not continue_message else ' ' * len(Logger.last.header or ''),
 			message,
 		]
 		# If a traceback exists, format it and append it to the log.
@@ -191,11 +211,17 @@ class Logger(Singleton):
 			for line in lines:
 				print_indent(*[str(item).ljust(max_widths[index], ' ') for index, item in enumerate(line)])
 		content.append(end)
-		_content = ' '.join(content)
+		_content = ' '.join(list(filter(lambda item: item, content)))
 		# Print to console if required.
 		is_min_log = self._min_log_index <= self.log_types.index(log_type)
 		if force_print if force_print is not None else (is_min_log if print_message is None else print_message and is_min_log):
 			print(_content)
+
+		cls.last.log_type = log_type
+		cls.last.date = date
+		cls.last.header = header_string
+		cls.last.message = message
+
 		# Write to file if not in print-only mode.
 		if print_only or self._print_only:
 			return
