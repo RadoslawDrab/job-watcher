@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Write version
-        run: echo "VERSION = ${{ github.event.inputs.manual_tag || github.ref_name }}" > version.py
+        run: echo "VERSION = '${{ github.event.inputs.manual_tag || github.ref_name }}'" > version.py
 
       - uses: actions/setup-python@v5
         with:
