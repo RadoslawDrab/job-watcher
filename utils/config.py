@@ -23,8 +23,14 @@ class Command(ConfigNamespace):
 	"""
 	value: str = None
 	"""(Required) CLI command"""
+	extract: str | None = None
+	"""(Optional) Regex to extract input data and use in command. Works after global `extract`"""
+	skip_no_match: bool = True
+	"""(Optional) Skip file if no match found. (default: true)"""
 	continue_on_error: bool | None = None
 	"""(Optional) Continue on command failure. Overrides global `continue_on_error` (default: false)"""
+	show_error: bool = True
+	"""(Optional) Show error in logs. Does not apply if `continue_on_error` is false (default: true)"""
 
 	@classmethod
 	def required_keys(cls) -> list[str]:
@@ -48,6 +54,8 @@ class Job(ConfigNamespace):
 	"""(Required) Commands to run. Can be a `string`, `Command`, or list of `strings` or `Commands`"""
 	extract: str = '(.*)\\.(.{2,})$'
 	"""(Optional) Regex to extract input data and use in commands. Use (?P<name>...) to named groups"""
+	skip_no_match: bool = True
+	"""(Optional) Skip file if no match found. (default: true)"""
 	max_iterations: int | None = None
 	"""(Optional) Maximum number of iterations. Overrides global `max_iterations`"""
 	scan_interval: int | None = None

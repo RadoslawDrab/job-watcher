@@ -86,6 +86,7 @@ def register_task():
                 if not job.check(str(item), re.IGNORECASE):
                     continue
                 paths.append(item.relative_to(upload_dir))
+
             if len(paths) > 0:
                 files_queue.put(paths)
 
@@ -103,50 +104,76 @@ def register_task():
                     continue
 
                 Logger.log(f"Converting '{path}'", print_only=True)
-                match = re.match(job.extract or '^.+$', str(path.name), re.IGNORECASE)
+                global_match = re.match(job.extract or '^.+$', str(path.name), re.IGNORECASE)
 
-                if match is None:
+                if global_match is None and job.skip_no_match:
                     Logger.log(f"File '{path}' does not match pattern '{job.extract}'")
                     return
 
-                match_data = { '_' + str(index): value for index, value in enumerate(match.groups()) }
+                def get_match_args(match: re.Match, start_index: int = 0):
+                    return { '_' + str(index + start_index): value for index, value in enumerate(match.groups()) }
 
                 cmds: list[str | Command] = (job.cmd if isinstance(job.cmd, list) else [job.cmd]) if job.cmd else []
 
                 for cmd in cmds:
-                    cmd_value = cmd if isinstance(cmd, str) else cmd.value
-                    continue_on_error = cmd.continue_on_error if isinstance(cmd, Command) and cmd.continue_on_error is not None else Config.continue_on_error
+                    if isinstance(cmd, Command):
+                        cmd_value: str = cmd.value
+                        continue_on_error: bool = cmd.continue_on_error
+                        extract: str | None = cmd.extract
+                        show_error: bool = cmd.show_error if cmd.show_error is not None else True
+                        skip_no_match: bool = cmd.skip_no_match
+                    else:
+                        cmd_value = cmd
+                        continue_on_error = Config.continue_on_error
+                        extract = None
+                        show_error = True
+                        skip_no_match = job.skip_no_match
 
                     if len(cmd_value) == 0:
                         Logger.log(f"Command is empty, skipping", log_type='WARNING')
                         continue
 
+                    match_kwargs = global_match.groupdict() if global_match is not None else {}
+                    match_args = get_match_args(global_match) if global_match is not None else {}
+                    if extract:
+                        match = re.match(extract, str(path.name), re.IGNORECASE)
+                        if match is not None:
+                            match_kwargs.update(match.groupdict())
+                            match_args = get_match_args(match)
+                        elif match is None and skip_no_match:
+                            Logger.log(f"File '{path}' does not match pattern '{extract}'")
+                            continue
+
                     template = env.from_string(cmd_value)
                     _kwargs = {
-                        **match.groupdict(),
-                        'args': match_data,
+                        **match_kwargs,
+                        'args': match_args,
                         'input': str(upload_dir.joinpath(path)),
                         'input_stem': str(path.stem),
                         'input_name': str(path.name),
                         'input_ext': str(path.suffix),
                         'input_dir': upload_dir,
+                        'input_parent_dir': path.parent if path.parent != '.' else '',
                         'output_dir': output_dir,
                         'tmp_dir': tmp_dir,
                         'cwd': Path.cwd()
                     }
-                    rendered = template.render(**_kwargs, keys=get_dict_keys(_kwargs, include_dicts=True))
 
                     try:
+                        rendered = template.render(**_kwargs, keys=get_dict_keys(_kwargs, include_dicts=True))
+
                         text = subprocess.run(rendered, check=True, shell=True, capture_output=True, text=True)
                         if len(text.stdout) > 0: Logger.log(text.stdout, log_type='INFO')
-                    except Exception as error:
-                        Logger.log('Error executing command:', str(error), f'[CMD: "{rendered}"]', log_type='ERROR')
+                    except subprocess.CalledProcessError as error:
+                        if show_error or not continue_on_error:
+                            Logger.log(f'Error executing command: {str(error.stderr).strip()}', log_type='ERROR')
+                            Logger.log(f'[Command: {str(error.cmd).lstrip('\n')}]', log_type='ERROR', continue_message=True)
                         if not continue_on_error: break
 
                 Database.data[posix_path] = current_iteration + 1
 
                 Database.save()
-                files_queue.task_done()
+            files_queue.task_done()
 
 def init():
     try:
