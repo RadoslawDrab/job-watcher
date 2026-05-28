@@ -48,7 +48,7 @@ except Exception as error:
 
 # Register tasks
 def register_task():
-    for job in Config.conversion:
+    for job in Config.jobs:
         if job.name is None:
             raise ValueError('Task name is required')
         if job.cmd is None:
@@ -73,14 +73,14 @@ def register_task():
         output_dir.mkdir(exist_ok=True)
         tmp_dir.mkdir(exist_ok=True)
 
-        Database(tmp_dir.joinpath('db.json'))
+        Database(tmp_dir.joinpath('db.json'), persistent=Config.db_persistent)
 
         Logger.log(f"Registering task '{job.name}'", print_only=True)
 
         @TasksHandler.set(f'{task_name_prefix}watcher', interval=timedelta(seconds=scan_interval), log=True, print_message=True, log_type='DEBUG')
         def watcher(**kwargs):
             paths: list[Path] = []
-            for item in upload_dir.rglob('*'):
+            for item in upload_dir.glob('**/*' if Config.recursive else '*'):
                 if not item.is_file() and not item.is_dir() if include_dirs else not item.is_file():
                     continue
                 if not job.check(str(item), re.IGNORECASE):

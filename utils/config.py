@@ -4,29 +4,63 @@ from pathlib import Path
 
 import yaml
 
-from utils.classes import Namespace, Singleton
+from utils.classes import Singleton
+from utils import ConfigNamespace
 
 
-class Logs(Namespace):
-	path: Path = Path('./job-worker.log')
+class Logs(ConfigNamespace):
+	path: Path = Path.cwd().joinpath('job-worker.log')
+	"""(Required) Path to logs file (default: $CWD/job-worker.log)"""
 	level: str = 'INFO'
-class Command(Namespace):
+	"""(Optional) Log level. Choices: [DEBUG, INFO, WARNING, ERROR] (default: INFO)"""
+	@classmethod
+	def required_keys(cls) -> list[str]:
+		return ['path']
+class Command(ConfigNamespace):
+	"""
+	Represents a single shell command entry.
+	continue_on_error controls whether the job task proceeds on failure.
+	"""
 	value: str = None
-	continue_on_error: bool = False
-class Conversion(Namespace):
-	name: str = None
-	upload_dir: Path | None = None
-	output_dir: Path | None = None
-	tmp_dir: Path | None = None
-	cmd: str | Command | list[str | Command] | None = None
-	extract: str = '(.*)\\.(.{2,})$'
-	max_iterations: int | None = None
-	scan_interval: int | None = None
-	scan_exclude: list[str] = []
-	scan_include: list[str] = []
-	include_dirs: bool | None = None
+	"""(Required) CLI command"""
+	continue_on_error: bool | None = None
+	"""(Optional) Continue on command failure. Overrides global `continue_on_error` (default: false)"""
 
-	def _check_regex(self, value: str, check_list: list[str], flags: int | re.RegexFlag = 0):
+	@classmethod
+	def required_keys(cls) -> list[str]:
+		return ['value']
+class Job(ConfigNamespace):
+	"""
+	Defines a single job task. Multiple conversions can be listed
+	under the top-level `jobs` key in config.yml.
+	"""
+	name: str = None
+	"""(Required) Task name"""
+	upload_dir: Path | None = None
+	"""(Optional) Upload directory. Must be absolute. Overrides global `upload_dir`"""
+	output_dir: Path | None = None
+	"""(Optional) Output directory. Must be absolute. Overrides global `output_dir`"""
+	tmp_dir: Path | None = None
+	"""(Optional) Temporary directory. Overrides global `tmp_dir`"""
+	recursive: bool = True
+	"""Search recursively. Overrides global `recursive`"""
+	cmd: str | Command | list[str | Command] = None
+	"""(Required) Commands to run. Can be a `string`, `Command`, or list of `strings` or `Commands`"""
+	extract: str = '(.*)\\.(.{2,})$'
+	"""(Optional) Regex to extract input data and use in commands. Use (?P<name>...) to named groups"""
+	max_iterations: int | None = None
+	"""(Optional) Maximum number of iterations. Overrides global `max_iterations`"""
+	scan_interval: int | None = None
+	"""(Optional) Scan interval. Overrides global `scan_interval`"""
+	scan_exclude: list[str] = []
+	"""(Optional) Scan exclude. Allows RegEx. Exclude > Include (default: [])"""
+	scan_include: list[str] = []
+	"""(Optional) Scan include. Allows RegEx. Exclude > Include (default: [])"""
+	include_dirs: bool | None = None
+	"""(Optional) Include directories. Overrides global `include_dirs`"""
+
+	@staticmethod
+	def _check_regex(value: str, check_list: list[str], flags: int | re.RegexFlag = 0):
 		return any(re.match(i, value, flags=flags) for i in check_list)
 	def check(self, value: str, flags: int | re.RegexFlag= 0):
 		return not self.is_excluded(value, flags) and self.is_included(value, flags)
@@ -35,47 +69,69 @@ class Conversion(Namespace):
 	def is_excluded(self, value: str, flags: int | re.RegexFlag= 0):
 		return self._check_regex(value, self.scan_exclude, flags) if len(self.scan_exclude) > 0 else False
 
-class Config(Singleton):
+	@classmethod
+	def required_keys(cls) -> list[str]:
+		return ['name', 'cmd']
+
+class Config(Singleton, ConfigNamespace):
+	# Raw parsed yaml, set before _set_attr runs
 	data: dict = {}
 	logs: Logs = Logs()
-	conversion: list[Conversion] = [
-		Conversion(
+	jobs: list[Job] = [
+		Job(
 			name='example',
+			extract='(?P<name>.*\\..{2,})$',
 			cmd=[
-				Command(
-					value='echo {{ input }} > {{ output_dir }}/{{ input_stem }}.txt',
-					continue_on_error=True
-				)
+				Command(value='echo Working on: {{ name }}', continue_on_error=True),
+				'echo File extension: {{ input_ext }}'
 			]
 		)
 	]
 	max_iterations: int = 1
+	"""(Optional) Maximum number of iterations per file. 0 for infinite (default: 1)"""
 	scan_interval: int = 15
+	"""(Optional) Scan interval (default: 15 seconds)"""
 	include_dirs: bool = False
+	"""(Optional) Include directories (default: false)"""
 	upload_dir: Path = Path.cwd().joinpath('upload')
+	"""(Required) Upload directory. Must be absolute (default: $CWD/upload)"""
 	tmp_dir: Path = Path.cwd().joinpath('tmp')
+	"""(Optional) Temporary directory. Must be absolute (default: $CWD/tmp)"""
 	output_dir: Path = Path.cwd().joinpath('output')
+	"""(Required) Output directory. Must be absolute (default: $CWD/output)"""
+	recursive: bool = True
+	"""(Optional) Search recursively (default: true)"""
 	continue_on_error: bool = False
+	"""(Optional) Continue on command failure (default: false)"""
+	db_persistent: bool = False
+	"""(Optional) Use persistent or in-memory database (default: false)"""
+
+	@classmethod
+	def required_keys(cls) -> list[str]:
+		return ['logs', 'jobs', 'upload_dir', 'output_dir']
 
 	def __init__(self, config_path: Path = Path('./config.yml')):
 		super().__init__()
 
-		# if not config_path.is_absolute(): config_path = resource_path(config_path)
-
 		if not config_path.exists():
-			Config.data = self._get_config(['data'])
+			# Generate a default config.yml from class-level defaults and exit
+			Config.data = self._get_config(['required_keys', 'data'])
 			with open(config_path, 'w') as f:
-				f.write(yaml.dump(Config.data))
+				f.write(yaml.dump(Config.data, sort_keys=False))
 		else:
 			with open(config_path, 'r') as f:
 				config: dict = yaml.safe_load(f)
 				Config.data = config
 
 		Config._set_attr(Config.data)
+		Config._validate()
+
 	def __repr__(self):
 		return f"{self.__class__.__name__}({', '.join(f'{key}={value}' for key, value in self.__dict__.items() if not key.startswith('_'))})"
 	@classmethod
 	def _coerce(cls, target_cls: type, data: dict) -> dict:
+		"""Shallow-coerce a dict's values to match target_cls annotations.
+        Only handles Path; deeper coercion is delegated to from_dict / _set_attr."""
 		annotations = {}
 		for klass in reversed(target_cls.__mro__):
 			annotations.update(getattr(klass, '__annotations__', {}))
@@ -84,7 +140,6 @@ class Config(Singleton):
 		for k, v in data.items():
 			annotation = annotations.get(k)
 			if annotation is not None:
-				# unwrap Optional / Union to find Path
 				args = typing.get_args(annotation) or (annotation,)
 				if any(a is Path for a in args) and not isinstance(v, Path) and v is not None:
 					v = Path(v)
@@ -92,6 +147,8 @@ class Config(Singleton):
 		return result
 	@classmethod
 	def _set_attr(cls, obj: dict, parent: str | None = None):
+		"""Recursively apply a parsed yaml dict onto target (Config class or a
+        ConfigNamespace instance). Coerces lists, nested dicts, and Path values."""
 		target = parent if parent is not None else cls
 		target_cls = target if isinstance(target, type) else type(target)
 		annotations = {}
@@ -104,99 +161,51 @@ class Config(Singleton):
 
 			annotation = annotations.get(key)
 
+			# List: coerce dicts inside the list to the annotated Namespace subclass
 			if isinstance(value, list) and annotation is not None:
-				args = typing.get_args(annotation)
-				if args and isinstance(args[0], type) and issubclass(args[0], Namespace):
-					item_class = args[0]
-					setattr(target, key, [
-						item_class(**cls._coerce(item_class, item)) for item in value
-					])
+				flat_args = []
+				for arg in typing.get_args(annotation) or []:
+					for inner in (typing.get_args(arg) or (arg,)):
+						flat_args.append(inner)
+				nested_cls = next((a for a in flat_args if isinstance(a, type) and issubclass(a, ConfigNamespace)), None)
+				if nested_cls:
+					setattr(target, key, [nested_cls.from_dict(i) if isinstance(i, dict) else i for i in value])
 					continue
 
+			# Dict: coerce to the existing attribute's ConfigNamespace type
 			if isinstance(value, dict):
-				nested_instance = getattr(target, key)
-				nested_class = type(nested_instance)
-				setattr(target, key, nested_class(**cls._coerce(nested_class, value)))
-				continue
+				existing = getattr(target, key)
+				nested_cls = type(existing)
+				if issubclass(nested_cls, ConfigNamespace):
+					setattr(target, key, nested_cls.from_dict(value))
+					continue
 
+			# Scalar: coerce str → Path when the current value is a Path
 			existing = getattr(target, key)
 			if isinstance(existing, Path) and not isinstance(value, Path):
 				value = Path(value)
 
 			setattr(target, key, value)
 	@classmethod
-	def _get_config(cls, exclude: list[str] | None = None, target: Namespace | None = None):
+	@Singleton.exists
+	def _get_config(cls, exclude_keys: list[str] | None = None, target: ConfigNamespace | None = None):
+		"""Serialize Config (or a sub-namespace) to a plain dict via to_dict."""
+		if not exclude_keys: exclude_keys = []
 		if not target: target = cls
-		target_cls = target if isinstance(target, type) else type(target)
-		annotations = {}
-		for _cls in reversed(target_cls.__mro__):
-			annotations.update(getattr(_cls, '__annotations__', {}))
 
-		result = {}
+		return target.to_dict(exclude_keys)
 
-		for key in annotations:
-			if key.startswith('_'): continue
-			if exclude and key in exclude: continue
-
-			value = getattr(target, key, None)
-
-			if callable(value) and not isinstance(value, Namespace): continue
-
-			if isinstance(value, Namespace):
-				result[key] = cls._get_config(exclude, value)
-				continue
-
-			if isinstance(value, list):
-				args = typing.get_args(annotations[key])
-				if args and isinstance(args[0], type) and issubclass(args[0], Namespace):
-					result[key] = [cls._get_config(exclude, item) for item in value]
-					continue
-				result[key] = value
-				continue
-
-			if isinstance(value, Path):
-				result[key] = str(value)
-				continue
-
-			result[key] = value
-		return result
-
-
-def _dump_with_comments(data: dict, comments: dict | None = None, indent: int = 0) -> str:
-	lines = []
-	prefix = ' ' * indent
-
-	for key, value in data.items():
-		comment_text = (comments or {}).get(key)
-		if comment_text:
-			for line in comment_text.strip().splitlines():
-				lines.append(f"{prefix}# {line.strip()}")
-
-		if isinstance(value, dict):
-			nested_comments = _get_comments_for(value)
-			lines.append(f"{prefix}{key}:")
-			lines.append(_dump_with_comments(value, nested_comments, indent + 2))
-
-		elif isinstance(value, list):
-			lines.append(f"{prefix}{key}:")
-			for item in value:
-				if isinstance(item, dict):
-					first = True
-					for k, v in item.items():
-						bullet = f"{prefix}  - {k}: {v}" if first else f"{prefix}    {k}: {v}"
-						lines.append(bullet)
-						first = False
-				else:
-					lines.append(f"{prefix}  - {item}")
-		else:
-			lines.append(f"{prefix}{key}: {value}")
-
-	return '\n'.join(lines)
-
-def _get_comments_for(data: dict) -> dict | None:
-	# match dict back to a Namespace class to pull _comments
-	for cls in [Config, Config.Logs, Config.Conversion]:
-		annotations = getattr(cls, '__annotations__', {})
-		if all(k in annotations for k in data if not k.startswith('_')):
-			return getattr(cls, '_comments', None)
-	return None
+	@classmethod
+	def _validate(cls):
+		for key in cls.required_keys():
+			value = getattr(cls, key, None)
+			if value is None:
+				raise ValueError(f"Missing required config key: '{key}'")
+		for key in cls.__annotations__:
+			value = getattr(cls, key, None)
+			if isinstance(value, ConfigNamespace):
+				value.validate(key)
+			elif isinstance(value, list):
+				for i, item in enumerate(value):
+					if isinstance(item, ConfigNamespace):
+						item.validate(f"{key}[{i}]")
