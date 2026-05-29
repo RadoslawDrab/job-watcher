@@ -6,20 +6,15 @@ from utils.logger import LOG_TYPES
 
 
 class Args(Singleton):
-	# log_level: str = 'INFO'
-	# upload_dir: Path = Path('../upload')
-	# output_dir: Path = Path('../output')
-	# log_path: Path = Path('./logs/teo-carts-converter.log')
 	config_path: Path = Path('./config.yml')
+	no_update: bool = False
+	mock_update: bool = False
 	def __new__(cls, *args, **kwargs):
 		super().__new__(cls)
 		parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
-		# self._parser.add_argument("--upload-dir", "-u", type=Path, default=self.upload_dir, help="Upload directory")
-		# self._parser.add_argument("--output-dir", "-o", type=Path, default=self.output_dir, help="Output directory")
-		# self._parser.add_argument("--log-path", type=Path, default=self.log_path, help="Logs file path. File extension must be .log")
-		# self._parser.add_argument("--log-level", type=str, default=self.log_level, help="Log level", choices=LOG_TYPES)
 		parser.add_argument("--config-path", '-c', type=Path, default=cls.config_path, help="Config path. File extension must be .yml or .yaml")
+		parser.add_argument("--no-update", action='store_true', default=cls.no_update, help="Do not check for updates")
+		parser.add_argument("--mock-update", action='store_true', default=cls.mock_update, help="Mock update check")
 
 		for key, value in parser.parse_args().__dict__.items():
 			if not hasattr(cls, key) or key.startswith('_'):

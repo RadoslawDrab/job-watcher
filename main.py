@@ -1,4 +1,3 @@
-import os
 import re
 import subprocess
 from datetime import timedelta
@@ -14,6 +13,8 @@ from utils.config import Command, Config, Job
 from utils.database import Database
 from utils.logger import Logger, LoggerFormat
 from utils.tasks import TasksHandler
+from utils.updater import Updater
+
 
 try:
     from version import VERSION
@@ -30,6 +31,12 @@ try:
         raise ValueError(f"Log file must have .log extension, got {Config.logs.path.suffix}")
 
     TasksHandler()
+    Updater(
+        github_user_name='RadoslawDrab',
+        github_repo_name='job-worker',
+        current_version=VERSION,
+        mock=Args.mock_update
+    )
     Logger(
         Config.logs.path,
         default_log_type='DEBUG',
@@ -180,7 +187,19 @@ def register_jobs():
 
 def init():
     try:
-        Logger.log(f'Version: {VERSION}', force_print=True)
+        update = Updater.check() if not Args.no_update else None
+        if Args.mock_update:
+            if update is None:
+                Logger.log('No update available', force_print=True, print_only=True)
+                return
+            Logger.log(f'Latest version: {update[0]}', force_print=True, print_only=True)
+            Logger.log(f'Download url: {update[1]}', force_print=True, continue_message=True, print_only=True)
+            return
+
+        if update:
+            Updater.apply(update[1])
+        else:
+            Logger.log(f'Version: {VERSION}', force_print=True)
 
         register_jobs()
         TasksHandler.start()
