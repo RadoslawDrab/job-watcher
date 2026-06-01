@@ -28,6 +28,8 @@ jobs:
     continue_on_error: true
     # (Optional) Show error in logs. Does not apply if `continue_on_error` is false (default: true)
     show_error: true
+    # (Optional) Variables to pass to command (default: null)
+    vars: null
   - 'echo File extension: {{ input_ext }}'
   # (Optional) Regex to extract input data and use in commands. Use (?P<name>...) to named groups
   extract: (?P<name>.*\..{2,})$
@@ -43,6 +45,8 @@ jobs:
   scan_include: []
   # (Optional) Include directories. Overrides global `include_dirs`
   include_dirs: null
+  # (Optional) Variables to pass to command (Default: null)
+  vars: null
 # (Optional) Maximum number of iterations per file. 0 for infinite (default: 1)
 max_iterations: 1
 # (Optional) Scan interval (default: 15 seconds)

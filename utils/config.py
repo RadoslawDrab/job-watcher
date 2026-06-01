@@ -29,6 +29,8 @@ class Command(ConfigNamespace):
 	"""(Required) CLI command"""
 	extract: str | None = None
 	"""(Optional) Regex to extract input data and use in command. Works after global `extract`"""
+	vars: dict[str, str] | None = None
+	"""(Optional) Variables to pass to command"""
 	skip_no_match: bool = True
 	"""(Optional) Skip file if no match found. (default: true)"""
 	continue_on_error: bool | None = None
@@ -68,6 +70,8 @@ class Job(ConfigNamespace):
 	"""(Optional) Scan include. Allows RegEx. Exclude > Include (default: [])"""
 	include_dirs: bool | None = None
 	"""(Optional) Include directories. Overrides global `include_dirs`"""
+	vars: dict[str, str] | None = None
+	"""(Optional) Variables to pass to command"""
 
 	@staticmethod
 	def _check_regex(value: str, check_list: list[str], flags: int | re.RegexFlag = 0):
@@ -92,7 +96,11 @@ class Config(Singleton, ConfigNamespace):
 			name='example',
 			extract='(?P<name>.*\\..{2,})$',
 			cmd=[
-				Command(value='echo Working on: {{ name }}', continue_on_error=True),
+				Command(
+					value='echo Working on: {{ name }}. Output: ({{ output_path }})',
+					continue_on_error=True,
+					vars={ 'output_path': '{{ output_dir }}/{{ input_ext }}' }
+				),
 				'echo File extension: {{ input_ext }}'
 			]
 		)

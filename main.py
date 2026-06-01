@@ -116,6 +116,7 @@ def register_job(job: Job):
 
             cmds: list[str | Command] = (job.cmd if isinstance(job.cmd, list) else [job.cmd]) if job.cmd else []
 
+            variables: dict[str, str] = {} if job.vars is None else job.vars
             for cmd in cmds:
                 if isinstance(cmd, Command):
                     cmd_value: str = cmd.value
@@ -123,6 +124,8 @@ def register_job(job: Job):
                     extract: str | None = cmd.extract
                     show_error: bool = cmd.show_error if cmd.show_error is not None else True
                     skip_no_match: bool = cmd.skip_no_match
+                    if cmd.vars is not None:
+                        variables.update(**cmd.vars)
                 else:
                     cmd_value = cmd
                     continue_on_error = Config.continue_on_error
@@ -159,6 +162,11 @@ def register_job(job: Job):
                     'tmp_dir': tmp_dir,
                     'cwd': Path.cwd()
                 }
+
+                for key, value in variables.items():
+                    if key in ['cwd', 'args']:
+                        continue
+                    _kwargs[key] = env.from_string(value).render(**_kwargs)
 
                 try:
                     rendered = template.render(**_kwargs, keys=get_dict_keys(_kwargs, include_dicts=True))
