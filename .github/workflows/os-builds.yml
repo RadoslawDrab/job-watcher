@@ -66,7 +66,7 @@ jobs:
           architecture: ${{ matrix.arch }}
 
       - name: Install dependencies
-        run: pip install -r requirements.txt pyinstaller google-genai
+        run: pip install -r requirements.txt pyinstaller
 
       - name: Build
         env:
@@ -85,6 +85,14 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install google-genai
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -94,8 +102,8 @@ jobs:
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GEMINI_MODEL: $GEMINI_RELEASE_NOTES_MODEL
-          GEMINI_MESSAGE: $GEMINI_RELEASE_NOTES_MESSAGE
+          GEMINI_MODEL: ${{ env.GEMINI_RELEASE_NOTES_MODEL }}
+          GEMINI_MESSAGE: ${{ env.GEMINI_RELEASE_NOTES_MESSAGE }}
         run: |
           python scripts/release_notes.py > release_notes.txt
           echo "notes<<EOF" >> $GITHUB_OUTPUT
@@ -104,7 +112,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ needs.config.outputs.tag }}${{ github.event.inputs.draft == 'true' && ' (draft)' || '' }}
+          tag_name: ${{ needs.config.outputs.tag }}
+          name: ${{ needs.config.outputs.tag }}${{ github.event.inputs.draft == 'true' && ' (draft)' || '' }}
           draft: ${{ github.event.inputs.draft == 'true' }}
           files: dist/*
         env:
