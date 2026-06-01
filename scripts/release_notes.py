@@ -63,9 +63,10 @@ class ReleaseNotes:
 	def generate_release_notes(self, commits: list[str]) -> str:
 		if len(commits) == 0:
 			return ""
+		content = "\n\n".join(commits)
 		response = self._gemini_client.models.generate_content(
 			model=os.environ.get('GEMINI_MODEL', 'gemini-3.5-flash'),
-			contents=f"{self.ai_message}\n\n{"\n\n".join(commits)}"
+			contents=f"{self.ai_message}\n\n{content}"
 		)
 		return response.text
 
