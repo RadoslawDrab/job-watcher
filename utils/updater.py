@@ -1,4 +1,3 @@
-import shutil
 import urllib.request
 import json
 import sys
