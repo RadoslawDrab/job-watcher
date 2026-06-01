@@ -104,6 +104,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_MODEL: ${{ env.GEMINI_RELEASE_NOTES_MODEL }}
           GEMINI_MESSAGE: ${{ env.GEMINI_RELEASE_NOTES_MESSAGE }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python scripts/release_notes.py > release_notes.txt
           echo "notes<<EOF" >> $GITHUB_OUTPUT
