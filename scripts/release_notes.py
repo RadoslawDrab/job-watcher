@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import urllib.request
 import urllib.error
 import json
@@ -60,16 +61,22 @@ class ReleaseNotes:
 		return messages
 
 
-	def generate_release_notes(self, commits: list[str]) -> str:
+	def generate_release_notes(self, commits: list[str], max_retries: int = 3) -> str:
 		if len(commits) == 0:
 			return ""
 		content = "\n\n".join(commits)
-		response = self._gemini_client.models.generate_content(
-			model=os.environ.get('GEMINI_MODEL', 'gemini-3.5-flash'),
-			contents=f"{self.ai_message}\n\n{content}"
-		)
-		return response.text
-
+		for attempt in range(max_retries):
+			try:
+				response = self._gemini_client.models.generate_content(
+					model=os.environ.get('GEMINI_MODEL', 'gemini-3.5-flash'),
+					contents=f"{self.ai_message}\n\n{content}"
+				)
+				return response.text
+			except Exception as error:
+				if attempt < max_retries - 1:
+					wait_time = 2 ** attempt
+					time.sleep(wait_time)
+		return ""
 def init():
 	release_notes_path = Path('RELEASE_NOTES.md')
 	if release_notes_path.exists():
@@ -97,7 +104,10 @@ def init():
 
 	messages = release_notes.get_commit_messages((last_first_tag['sha'], last_second_tag['sha']) if last_first_tag and last_second_tag else None)
 
-	notes = release_notes.generate_release_notes([message['message'] for message in messages])
+	notes = release_notes.generate_release_notes(
+		[message['message'] for message in messages],
+		max_retries=3
+	)
 
 	print(notes)
 
