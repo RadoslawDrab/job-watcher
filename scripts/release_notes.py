@@ -17,7 +17,8 @@ class ReleaseNotes:
 		self._github_token = github_token
 		self._gemini_client = genai.Client()
 	def _get_path(self, *paths: str):
-		return f'{self.BASE_PATH}/{self.user_name}/{self.repo_name}/{"/".join([re.sub('^/|/$', '', p) for p in paths])}'
+		joined_path = "/".join([re.sub('^/|/$', '', p) for p in paths])
+		return f'{self.BASE_PATH}/{self.user_name}/{self.repo_name}/{joined_path}'
 	def _get_response(self, *paths: str) -> dict | None:
 		try:
 			headers = { "User-Agent": f"{self.repo_name}" }
